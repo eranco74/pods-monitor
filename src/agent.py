@@ -42,7 +42,7 @@ def get_sampling_params():
     else:
         strategy = {"type": "greedy"}
 
-    max_tokens = int(os.getenv("MAX_TOKENS", 512))
+    max_tokens = int(os.getenv("MAX_TOKENS", 64000))
 
 # sampling_params will later be used to pass the parameters to Llama Stack Agents/Inference APIs
     sampling_params = {
@@ -51,6 +51,7 @@ def get_sampling_params():
 }
     
     return sampling_params
+
 sampling_params = get_sampling_params()
 logger.info(f"Inference Parameters:\tModel: {model_id}\tSampling Parameters: {sampling_params}")
 
@@ -139,13 +140,14 @@ def create_agent(client: LlamaStackClient) -> Agent:
         client (LlamaStackClient): An instance of the LlamaStackClient connected to the Llama Stack server.
     """
     # Define the agent's system prompt
-    model_prompt= """You are a helpful assistant. You have access to a number of tools.
-Whenever a tool is called, be sure return the Response in a friendly and helpful tone."""
+    system_prompt= """You are an intelligent agent designed to assist users efficiently and effectively.
+You have access to a range of tools to help you complete tasks.
+When using a tool, always return the result in a clear, friendly, and helpful tone that the user can easily understand."""
     # Create simple agent with tools
     agent = Agent(
         client,
         model=model_id, # replace this with your choice of model
-        instructions = model_prompt , # update system prompt based on the model you are using
+        instructions = system_prompt , # update system prompt based on the model you are using
         tools=[dict(
                 name="builtin::rag",
                 args={
@@ -167,11 +169,13 @@ def run_task(agent_instance: Agent, namespace: str, use_stream=False):
         use_stream (bool): Whether to stream the agent's response in real-time.
     """
 
-    logger.info(f"Triggering agent'' at {time.ctime()}...")
+    logger.info(f"Triggering agent for namespace {namespace} at {time.ctime()}...")
 
     user_prompts = [
         "List all the pods in the {namespace} namespace",
-        "Send a message with the pods name to demo channel the on Slack",]
+        "Send a message with the pods name to 'demos' channel the on Slack",]
+
+
     session_id = agent_instance.create_session(session_name=f"session_{int(time.time())}")
     for i, prompt in enumerate(user_prompts):
         response = agent_instance.create_turn(
@@ -194,7 +198,7 @@ if __name__ == "__main__":
     agent = create_agent(client)
     while True:
         try:
-            run_task(agent)
+            run_task(agent, namespace)
         except Exception as e:
             print(f"An error occurred during agent execution: {e}")
             # Implement more robust error handling if needed, e.g., logging to a file
